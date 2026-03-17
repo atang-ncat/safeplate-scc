@@ -4,9 +4,20 @@
 
 ---
 
-## 🎯 Problem
+## 🎯 The Problem
 
-Every year, 1 in 6 Americans gets sick from foodborne illness. Santa Clara County conducts thousands of restaurant inspections, but this data is buried in hard-to-read government databases. **Residents have no easy way to check if their favorite restaurant is safe before they eat there.**
+Every year, **48 million Americans** get sick from foodborne illness — that's 1 in 6 people. **128,000 are hospitalized** and **3,000 die** (CDC). Behind every statistic is someone who just wanted a safe meal.
+
+Santa Clara County — home to **2 million residents** and the heart of Silicon Valley — conducts **21,895 restaurant inspections** annually and documents **64,364 violations** across **8,588 food establishments**. This data is public, but it's effectively invisible:
+
+- 📄 **Buried in spreadsheets** — raw CSVs on a government open data portal that most residents will never find
+- 🔢 **No risk context** — individual inspection scores mean nothing without historical trend analysis
+- 🚫 **No spatial awareness** — you can't ask "which restaurants near me are safe?" and get an answer
+- 🤖 **No intelligence** — the data just sits there; nobody is analyzing patterns across 86,000+ records
+
+**The result?** A family picks a restaurant based on Yelp stars and vibes — completely unaware that it had 12 critical health violations in the past year, including improper food temperature storage and pest infestations.
+
+**SafePlate SCC changes that.** We built an AI-powered food safety intelligence platform that turns raw county data into something any resident can understand in seconds — powered entirely by NVIDIA Nemotron running locally on the DGX Spark. No cloud. No API keys. Just the GB10 chip protecting public health.
 
 ## 💡 Solution
 
