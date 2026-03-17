@@ -97,7 +97,10 @@
                     <p class="chat-subtitle">Powered by NVIDIA Nemotron</p>
                 </div>
             </div>
-            <button id="chat-close" class="close-btn">✕</button>
+            <div style="display:flex;gap:6px;">
+                <button id="chat-expand" class="close-btn" title="Expand" onclick="toggleChatExpand()">⤢</button>
+                <button id="chat-close" class="close-btn">✕</button>
+            </div>
         </div>
         <div id="chat-messages">
             <div class="message bot">
@@ -382,6 +385,35 @@
         }
     }
 
+    function toggleChatExpand() {
+        const panel = document.getElementById('chat-panel');
+        const btn = document.getElementById('chat-expand');
+        panel.classList.toggle('chat-expanded');
+        btn.textContent = panel.classList.contains('chat-expanded') ? '⤡' : '⤢';
+    }
+
+    function renderMarkdown(text) {
+        let html = escapeHtml(text);
+        // Bold: **text**
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        // Italic: *text*
+        html = html.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>');
+        // Bullet lists: lines starting with - or •
+        html = html.replace(/^[\-•]\s+(.+)$/gm, '<li>$1</li>');
+        html = html.replace(/(<li>.*<\/li>\n?)+/gs, '<ul>$&</ul>');
+        // Numbered lists: lines starting with 1. 2. etc
+        html = html.replace(/^(\d+)\.\s+(.+)$/gm, '<li>$2</li>');
+        // Headings: lines starting with ##
+        html = html.replace(/^###\s+(.+)$/gm, '<strong style="font-size:14px;">$1</strong>');
+        html = html.replace(/^##\s+(.+)$/gm, '<strong style="font-size:15px;">$1</strong>');
+        // Line breaks
+        html = html.replace(/\n/g, '<br>');
+        // Clean up extra <br> inside lists
+        html = html.replace(/<br><li>/g, '<li>');
+        html = html.replace(/<\/li><br>/g, '</li>');
+        return html;
+    }
+
     async function sendChat() {
         const input = document.getElementById('chat-input');
         const message = input.value.trim();
@@ -432,7 +464,7 @@
             // Add the actual response after trace
             const respDiv = document.createElement('div');
             respDiv.className = 'message bot trace-animate';
-            respDiv.textContent = data.response;
+            respDiv.innerHTML = `<div class="message-content">${renderMarkdown(data.response)}</div>`;
             container.appendChild(respDiv);
             container.scrollTop = container.scrollHeight;
         } catch (e) {

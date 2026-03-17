@@ -629,6 +629,29 @@ body {
     to { transform: translateY(0); opacity: 1; }
 }
 
+#chat-panel.chat-expanded {
+    width: 520px;
+    height: calc(100vh - 120px);
+    bottom: 10px;
+    right: 10px;
+    border-radius: 16px;
+}
+
+.message.bot .message-content ul,
+.message.bot .message-content ol {
+    margin: 6px 0 6px 16px;
+    padding: 0;
+}
+
+.message.bot .message-content li {
+    margin-bottom: 4px;
+    line-height: 1.5;
+}
+
+.message.bot .message-content strong {
+    color: var(--accent);
+}
+
 .chat-header {
     display: flex;
     align-items: center;
