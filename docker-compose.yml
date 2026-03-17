@@ -1,0 +1,59 @@
+# SafePlate SCC — Docker Compose for NVIDIA DGX Spark
+# Container-first architecture per DGX Spark SKILL.md guidelines
+# Platform: linux/arm64 (GB10 Grace Blackwell Superchip)
+
+services:
+  # Main web application
+  safeplate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: safeplate-scc
+    restart: always
+    platform: linux/arm64
+    ports:
+      - "8888:8888"
+    environment:
+      - LLM_HOST=http://host.docker.internal:8899
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./safeplate.db:/app/safeplate.db:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/api/stats"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # LLM server (Nemotron via llama.cpp)
+  # Runs on host GPU with --gpus all
+  llm:
+    image: ubuntu:22.04
+    container_name: safeplate-llm
+    restart: always
+    platform: linux/arm64
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8899:8899"
+    volumes:
+      - /home/nvidia/llama.cpp:/llama.cpp:ro
+      - /home/nvidia/models:/models:ro
+    command: >
+      /llama.cpp/build/bin/llama-server
+      -m /models/gguf/ggml-org--Nemotron-Nano-3-30B-A3B-GGUF/Nemotron-Nano-3-30B-A3B-Q4_K_M.gguf
+      --port 8899 --host 0.0.0.0
+      -ngl 999 -c 4096 --threads 8 -fa on
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8899/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 120s

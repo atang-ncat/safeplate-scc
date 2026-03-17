@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafePlate SCC — AI Food Safety Guardian</title>
+    <meta name="description" content="AI-powered food safety intelligence for Santa Clara County. Know before you eat.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header id="app-header">
+        <div class="header-content">
+            <div class="logo-section">
+                <div class="logo-icon">🛡️</div>
+                <div>
+                    <h1>SafePlate <span class="accent">SCC</span></h1>
+                    <p class="tagline">AI-Powered Food Safety Intelligence</p>
+                </div>
+            </div>
+            <div class="header-stats" id="header-stats">
+                <div class="stat-chip" id="stat-restaurants">
+                    <span class="stat-value">—</span>
+                    <span class="stat-label">Restaurants</span>
+                </div>
+                <div class="stat-chip" id="stat-inspections">
+                    <span class="stat-value">—</span>
+                    <span class="stat-label">Inspections</span>
+                </div>
+                <div class="stat-chip safe" id="stat-safe">
+                    <span class="stat-value">—</span>
+                    <span class="stat-label">Safe</span>
+                </div>
+                <div class="stat-chip danger" id="stat-risky">
+                    <span class="stat-value">—</span>
+                    <span class="stat-label">High Risk</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Search Bar -->
+    <div id="search-container">
+        <div class="search-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" placeholder="Search restaurants, addresses, or ask a question..." autocomplete="off">
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="low">🟢 Safe</button>
+                <button class="filter-btn" data-filter="medium">🟡 Caution</button>
+                <button class="filter-btn" data-filter="high">🔴 Risk</button>
+            </div>
+            <span id="search-count" class="search-count"></span>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main id="main-content">
+        <!-- Map -->
+        <div id="map-container">
+            <div id="map"></div>
+            <div id="map-legend">
+                <div class="legend-title">Risk Level</div>
+                <div class="legend-item"><span class="legend-dot low"></span> Low Risk (0-25)</div>
+                <div class="legend-item"><span class="legend-dot medium"></span> Medium Risk (26-50)</div>
+                <div class="legend-item"><span class="legend-dot high"></span> High Risk (51-100)</div>
+            </div>
+        </div>
+
+        <!-- Detail Panel (hidden by default) -->
+        <div id="detail-panel" class="hidden">
+            <button id="close-detail" class="close-btn">✕</button>
+            <div id="detail-content">
+                <!-- Filled dynamically -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Chat Toggle Button -->
+    <button id="chat-toggle" title="Ask SafePlate AI">
+        <span class="chat-icon">🤖</span>
+        <span class="chat-label">Ask AI</span>
+    </button>
+
+    <!-- Chat Panel -->
+    <div id="chat-panel" class="hidden">
+        <div class="chat-header">
+            <div class="chat-header-info">
+                <span class="chat-avatar">🤖</span>
+                <div>
+                    <h3>SafePlate AI</h3>
+                    <p class="chat-subtitle">Powered by NVIDIA Nemotron</p>
+                </div>
+            </div>
+            <button id="chat-close" class="close-btn">✕</button>
+        </div>
+        <div id="chat-messages">
+            <div class="message bot">
+                <div class="message-content">
+                    👋 Hi! I'm SafePlate AI, powered by <strong>NVIDIA Nemotron</strong>.
+                    Ask me anything about food safety in Santa Clara County!
+                    <br><br>
+                    Try: <em>"Is it safe to eat at Taco Bell?"</em> or <em>"Which restaurants have critical violations?"</em>
+                </div>
+            </div>
+        </div>
+        <div id="chat-context" class="chat-context hidden">
+            <span class="context-icon">📍</span>
+            <span id="chat-context-text">Viewing: </span>
+            <button id="clear-context" class="clear-context-btn">✕</button>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Ask about food safety..." autocomplete="off">
+            <button id="chat-send">→</button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="loader">
+            <div class="loader-spinner"></div>
+            <p>Loading SafePlate SCC...</p>
+            <p class="loader-sub">Mapping 8,500+ restaurants</p>
+        </div>
+    </div>
+
+    <script>
+    // ========== SafePlate SCC - Main App ==========
+
+    const API_BASE = '';
+    let map, markersLayer;
+    let allRestaurants = [];
+    let activeFilter = 'all';
+    let currentContext = { restaurantId: null, restaurantName: null, searchQuery: null };
+
+    // ---------- Initialize ----------
+
+    async function init() {
+        initMap();
+        await loadStats();
+        await loadRestaurants();
+        setupEventListeners();
+        hideLoading();
+    }
+
+    function initMap() {
+        map = L.map('map', {
+            center: [37.35, -121.95],
+            zoom: 12,
+            zoomControl: true,
+            maxZoom: 18,
+            minZoom: 9,
+        });
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20,
+        }).addTo(map);
+
+        markersLayer = L.layerGroup().addTo(map);
+    }
+
+    // ---------- Data Loading ----------
+
+    async function loadStats() {
+        try {
+            const resp = await fetch(`${API_BASE}/api/stats`);
+            const stats = await resp.json();
+
+            document.querySelector('#stat-restaurants .stat-value').textContent =
+                stats.total_businesses.toLocaleString();
+            document.querySelector('#stat-inspections .stat-value').textContent =
+                stats.total_inspections.toLocaleString();
+            document.querySelector('#stat-safe .stat-value').textContent =
+                (stats.risk_distribution.low || 0).toLocaleString();
+            document.querySelector('#stat-risky .stat-value').textContent =
+                (stats.risk_distribution.high || 0).toLocaleString();
+        } catch (e) {
+            console.error('Failed to load stats:', e);
+        }
+    }
+
+    async function loadRestaurants() {
+        try {
+            const resp = await fetch(`${API_BASE}/api/restaurants/geo`);
+            allRestaurants = await resp.json();
+            renderMarkers(allRestaurants);
+        } catch (e) {
+            console.error('Failed to load restaurants:', e);
+        }
+    }
+
+    // ---------- Map Rendering ----------
+
+    function getRiskColor(level) {
+        switch (level) {
+            case 'low': return '#00e676';
+            case 'medium': return '#ffab00';
+            case 'high': return '#ff1744';
+            default: return '#90a4ae';
+        }
+    }
+
+    function getRiskEmoji(level) {
+        switch (level) {
+            case 'low': return '🟢';
+            case 'medium': return '🟡';
+            case 'high': return '🔴';
+            default: return '⚪';
+        }
+    }
+
+    function createMarkerIcon(riskLevel) {
+        const color = getRiskColor(riskLevel);
+        return L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="
+                background: ${color};
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                border: 2px solid rgba(255,255,255,0.6);
+                box-shadow: 0 0 8px ${color}80;
+            "></div>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7],
+        });
+    }
+
+    function renderMarkers(restaurants) {
+        markersLayer.clearLayers();
+        let count = 0;
+
+        restaurants.forEach(r => {
+            if (activeFilter !== 'all' && r.risk_level !== activeFilter) return;
+            if (!r.latitude || !r.longitude) return;
+
+            const marker = L.marker([r.latitude, r.longitude], {
+                icon: createMarkerIcon(r.risk_level),
+            });
+
+            marker.bindPopup(`
+                <div class="popup-content">
+                    <h3>${escapeHtml(r.name)}</h3>
+                    <div class="popup-risk ${r.risk_level}">
+                        ${getRiskEmoji(r.risk_level)} Risk Score: <strong>${r.risk_score}</strong>/100
+                    </div>
+                    <div class="popup-details">
+                        <div>📍 ${escapeHtml(r.address || '')}${r.city ? ', ' + escapeHtml(r.city) : ''}</div>
+                        <div>📋 Avg Score: ${Math.round(r.avg_score || 0)}/100</div>
+                        <div>⚠️ Critical Violations: ${r.critical_violations || 0}</div>
+                        <div>📊 Total Violations: ${r.total_violations || 0}</div>
+                        ${r.last_inspection_score ? `<div>🕐 Last Score: ${r.last_inspection_score}/100</div>` : ''}
+                    </div>
+                    <button class="popup-detail-btn" onclick="showDetail('${r.business_id}')">
+                        View Full Report →
+                    </button>
+                </div>
+            `, { maxWidth: 300 });
+
+            marker.on('click', () => {
+                currentContext = { restaurantId: r.business_id, restaurantName: r.name, searchQuery: null };
+                updateChatContext();
+            });
+
+            markersLayer.addLayer(marker);
+            count++;
+        });
+
+        console.log(`Rendered ${count} markers`);
+    }
+
+    // ---------- Detail Panel ----------
+
+    async function showDetail(businessId) {
+        const panel = document.getElementById('detail-panel');
+        const content = document.getElementById('detail-content');
+        panel.classList.remove('hidden');
+
+        content.innerHTML = '<div class="loading-detail"><div class="loader-spinner small"></div> Loading...</div>';
+
+        // Set context to this restaurant
+        const contextRestaurant = allRestaurants.find(r => r.business_id === businessId);
+        if (contextRestaurant) {
+            currentContext = { restaurantId: businessId, restaurantName: contextRestaurant.name, searchQuery: null };
+            updateChatContext();
+        }
+
+        try {
+            const resp = await fetch(`${API_BASE}/api/restaurants/${businessId}`);
+            const data = await resp.json();
+            const biz = data.business;
+            const inspections = data.inspections || [];
+            const violations = data.violations || [];
+
+            const violationsList = violations.slice(0, 10).map(v => `
+                <div class="violation-item ${v.critical ? 'critical' : ''}">
+                    <div class="violation-header">
+                        <span class="violation-badge ${v.critical ? 'critical' : 'minor'}">${v.critical ? '⚠️ CRITICAL' : 'ℹ️ Minor'}</span>
+                        <span class="violation-code">${escapeHtml(v.code || '')}</span>
+                    </div>
+                    <div class="violation-desc">${escapeHtml(v.description || '')}</div>
+                    ${v.violation_comment ? `<div class="violation-comment">${escapeHtml(v.violation_comment.substring(0, 300))}</div>` : ''}
+                </div>
+            `).join('');
+
+            const inspectionsList = inspections.slice(0, 5).map(i => `
+                <div class="inspection-item">
+                    <span class="inspection-date">${i.date || 'N/A'}</span>
+                    <span class="inspection-score ${(i.score || 0) >= 80 ? 'good' : (i.score || 0) >= 60 ? 'warn' : 'bad'}">${i.score || 'N/A'}</span>
+                    <span class="inspection-type">${escapeHtml(i.type || '')}</span>
+                </div>
+            `).join('');
+
+            content.innerHTML = `
+                <div class="detail-header">
+                    <div class="detail-risk-badge ${biz.risk_level}">
+                        ${getRiskEmoji(biz.risk_level)} ${biz.risk_level.toUpperCase()} RISK
+                    </div>
+                    <h2>${escapeHtml(biz.name)}</h2>
+                    <p class="detail-address">📍 ${escapeHtml(biz.address || '')}, ${escapeHtml(biz.city || '')}, ${escapeHtml(biz.state || '')} ${escapeHtml(biz.postal_code || '')}</p>
+                    ${biz.phone_number ? `<p class="detail-phone">📞 ${escapeHtml(biz.phone_number)}</p>` : ''}
+                </div>
+
+                <div class="detail-scores">
+                    <div class="score-card">
+                        <div class="score-value ${biz.risk_level}">${biz.risk_score}</div>
+                        <div class="score-label">Risk Score</div>
+                    </div>
+                    <div class="score-card">
+                        <div class="score-value">${Math.round(biz.avg_score || 0)}</div>
+                        <div class="score-label">Avg Inspection</div>
+                    </div>
+                    <div class="score-card">
+                        <div class="score-value ${(biz.critical_violations || 0) > 0 ? 'high' : ''}">${biz.critical_violations || 0}</div>
+                        <div class="score-label">Critical</div>
+                    </div>
+                    <div class="score-card">
+                        <div class="score-value">${biz.total_violations || 0}</div>
+                        <div class="score-label">Total Violations</div>
+                    </div>
+                </div>
+
+                <button class="ai-analyze-btn" onclick="aiAnalyze('${businessId}', '${escapeHtml(biz.name)}')">
+                    🤖 Ask AI to Analyze This Restaurant
+                </button>
+
+                ${inspectionsList ? `
+                <div class="detail-section">
+                    <h3>📋 Recent Inspections</h3>
+                    <div class="inspections-list">${inspectionsList}</div>
+                </div>` : ''}
+
+                ${violationsList ? `
+                <div class="detail-section">
+                    <h3>⚠️ Violations</h3>
+                    <div class="violations-list">${violationsList}</div>
+                </div>` : ''}
+            `;
+        } catch (e) {
+            content.innerHTML = '<p class="error">Failed to load restaurant details.</p>';
+        }
+    }
+
+    function closeDetail() {
+        document.getElementById('detail-panel').classList.add('hidden');
+    }
+
+    // ---------- AI Chat ----------
+
+    function toggleChat() {
+        const panel = document.getElementById('chat-panel');
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden')) {
+            document.getElementById('chat-input').focus();
+        }
+    }
+
+    async function sendChat() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        addChatMessage(message, 'user');
+        input.value = '';
+
+        // Create thinking container with trace area
+        const container = document.getElementById('chat-messages');
+        const traceDiv = document.createElement('div');
+        traceDiv.className = 'message bot';
+        traceDiv.innerHTML = '<div class="agent-trace" id="live-trace"><div class="trace-header">🔗 OpenClaw Agent Pipeline</div></div>';
+        container.appendChild(traceDiv);
+        container.scrollTop = container.scrollHeight;
+
+        try {
+            const payload = { message };
+            if (currentContext.restaurantId) {
+                payload.restaurant_id = currentContext.restaurantId;
+            }
+            if (currentContext.restaurantName && !message.toLowerCase().includes(currentContext.restaurantName.toLowerCase())) {
+                payload.message = `[Currently viewing: ${currentContext.restaurantName}] ${message}`;
+            }
+
+            const resp = await fetch(`${API_BASE}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await resp.json();
+
+            // Animate trace steps
+            const traceEl = document.getElementById('live-trace');
+            if (data.trace && data.trace.length > 0) {
+                for (let i = 0; i < data.trace.length; i++) {
+                    const step = data.trace[i];
+                    await new Promise(r => setTimeout(r, 250));
+                    const stepEl = document.createElement('div');
+                    stepEl.className = 'trace-step trace-animate';
+                    stepEl.innerHTML = `<span class="trace-icon">${step.icon}</span> ${escapeHtml(step.text)}`;
+                    traceEl.appendChild(stepEl);
+                    container.scrollTop = container.scrollHeight;
+                }
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            // Add the actual response after trace
+            const respDiv = document.createElement('div');
+            respDiv.className = 'message bot trace-animate';
+            respDiv.textContent = data.response;
+            container.appendChild(respDiv);
+            container.scrollTop = container.scrollHeight;
+        } catch (e) {
+            const errDiv = document.createElement('div');
+            errDiv.className = 'message bot';
+            errDiv.textContent = '❌ Sorry, I encountered an error. Please try again.';
+            container.appendChild(errDiv);
+        }
+    }
+
+    function aiAnalyze(businessId, name) {
+        const chatPanel = document.getElementById('chat-panel');
+        chatPanel.classList.remove('hidden');
+        const input = document.getElementById('chat-input');
+        input.value = `Is it safe to eat at ${name}? Give me a full safety analysis.`;
+        sendChat();
+    }
+
+    function addChatMessage(text, className) {
+        const container = document.getElementById('chat-messages');
+        const id = 'msg-' + Date.now();
+        const div = document.createElement('div');
+        div.className = `message ${className}`;
+        div.id = id;
+        div.innerHTML = `<div class="message-content">${formatMessage(text)}</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        return id;
+    }
+
+    function updateChatMessage(id, text) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.className = 'message bot';
+            el.innerHTML = `<div class="message-content">${formatMessage(text)}</div>`;
+            const container = document.getElementById('chat-messages');
+            container.scrollTop = container.scrollHeight;
+        }
+    }
+
+    function formatMessage(text) {
+        // Basic markdown-like formatting
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\n/g, '<br>');
+    }
+
+    // ---------- Search & Filters ----------
+
+    let searchTimeout;
+    function handleSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            const query = document.getElementById('search-input').value.trim().toLowerCase();
+            const countEl = document.getElementById('search-count');
+
+            if (!query) {
+                renderMarkers(allRestaurants);
+                countEl.textContent = '';
+                return;
+            }
+
+            const filtered = allRestaurants.filter(r =>
+                (r.name && r.name.toLowerCase().includes(query)) ||
+                (r.city && r.city.toLowerCase().includes(query)) ||
+                (r.address && r.address.toLowerCase().includes(query))
+            );
+            renderMarkers(filtered);
+
+            // Update context with search results
+            if (filtered.length === 1) {
+                currentContext = { restaurantId: filtered[0].business_id, restaurantName: filtered[0].name, searchQuery: query };
+            } else if (filtered.length > 1 && filtered.length <= 5) {
+                currentContext = { restaurantId: filtered[0].business_id, restaurantName: filtered[0].name, searchQuery: query };
+            } else {
+                currentContext = { restaurantId: null, restaurantName: null, searchQuery: query };
+            }
+            updateChatContext();
+
+            // Show result count
+            countEl.textContent = `${filtered.length} found`;
+            countEl.style.color = filtered.length === 0 ? '#ff1744' : '#94a3b8';
+
+            // Zoom to filtered results
+            if (filtered.length > 0 && filtered.length < 50) {
+                const bounds = L.latLngBounds(filtered.map(r => [r.latitude, r.longitude]));
+                map.fitBounds(bounds, { padding: [50, 50] });
+            }
+        }, 300);
+    }
+
+    function setFilter(filter) {
+        activeFilter = filter;
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.filter === filter);
+        });
+        renderMarkers(allRestaurants);
+    }
+
+    // ---------- Event Listeners ----------
+
+    function setupEventListeners() {
+        document.getElementById('search-input').addEventListener('input', handleSearch);
+        document.getElementById('search-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const query = e.target.value.trim();
+                // If it looks like a question, route to AI chat
+                const isQuestion = /[?]/.test(query) ||
+                    /^(is |how |what |which |should |tell me|are there|do |does |can |where )/i.test(query) ||
+                    /safe|dangerous|risk|violation|clean|dirty|best|worst/i.test(query);
+                if (isQuestion && query.length > 5) {
+                    // Open chat and send the question
+                    const chatPanel = document.getElementById('chat-panel');
+                    chatPanel.classList.remove('hidden');
+                    document.getElementById('chat-input').value = query;
+                    sendChat();
+                    e.target.value = '';
+                    const countEl = document.getElementById('search-count');
+                    countEl.textContent = '';
+                    renderMarkers(allRestaurants);
+                }
+            }
+        });
+
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => setFilter(btn.dataset.filter));
+        });
+
+        document.getElementById('chat-toggle').addEventListener('click', toggleChat);
+        document.getElementById('chat-close').addEventListener('click', toggleChat);
+        document.getElementById('chat-send').addEventListener('click', sendChat);
+        document.getElementById('clear-context').addEventListener('click', clearContext);
+        document.getElementById('chat-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+        document.getElementById('close-detail').addEventListener('click', closeDetail);
+
+        // Keyboard shortcut
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeDetail();
+                document.getElementById('chat-panel').classList.add('hidden');
+            }
+        });
+    }
+
+    // ---------- Utilities ----------
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    }
+
+    function updateChatContext() {
+        const contextEl = document.getElementById('chat-context');
+        const contextText = document.getElementById('chat-context-text');
+        if (currentContext.restaurantName) {
+            contextEl.classList.remove('hidden');
+            contextText.textContent = `Viewing: ${currentContext.restaurantName}`;
+        } else {
+            contextEl.classList.add('hidden');
+        }
+    }
+
+    function clearContext() {
+        currentContext = { restaurantId: null, restaurantName: null, searchQuery: null };
+        updateChatContext();
+    }
+
+    function hideLoading() {
+        const overlay = document.getElementById('loading-overlay');
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.style.display = 'none', 500);
+    }
+
+    // ---------- Start ----------
+    document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
