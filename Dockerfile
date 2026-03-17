@@ -16,7 +16,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PyTorch with CUDA 13.0 (required for sm_121 / GB10 Blackwell)
-RUN pip3 install torch --index-url https://download.pytorch.org/whl/cu130
+# Exact flag per DGX Spark SKILL.md — never use NGC base images
+RUN pip3 install torch torchvision torchaudio \
+    --index-url https://download.pytorch.org/whl/cu130
 
 # Create app directory
 WORKDIR /app
