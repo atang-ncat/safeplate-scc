@@ -17,7 +17,7 @@ Santa Clara County — home to **2 million residents** and the heart of Silicon 
 
 **The result?** A family picks a restaurant based on Yelp stars and vibes — completely unaware that it had 12 critical health violations in the past year, including improper food temperature storage and pest infestations.
 
-**SafePlate SCC changes that.** We built an AI-powered food safety intelligence platform that turns raw county data into something any resident can understand in seconds — powered entirely by NVIDIA Nemotron running locally on the DGX Spark. No cloud. No API keys. Just the GB10 chip protecting public health.
+**SafePlate SCC changes that.** I built an AI-powered food safety intelligence platform that turns raw county data into something any resident can understand in seconds — powered entirely by NVIDIA Nemotron running locally on the DGX Spark. No cloud. No API keys. Just the GB10 chip protecting public health.
 
 ## 💡 Solution
 
