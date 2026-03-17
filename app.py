@@ -318,13 +318,36 @@ async def chat(request: ChatRequest):
                         comment = (v['violation_comment'] or '')[:150]
                         context_parts.append(f"    - [{crit}] {v['description']}: {comment}")
 
-        # Step 5: General stats
+        # Step 5: Fallback — if no specific restaurant matched, give TOP safest
+        if not matches and not request.restaurant_id:
+            trace_steps.append({
+                "step": "fallback",
+                "icon": "🏆",
+                "text": "No specific restaurant found — fetching TOP safest restaurants"
+            })
+            top_safe = conn.execute(
+                """SELECT name, city, address, risk_score, risk_level, avg_score,
+                          critical_violations, total_violations
+                   FROM businesses
+                   WHERE risk_score IS NOT NULL AND risk_score > 0
+                   ORDER BY risk_score ASC LIMIT 10"""
+            ).fetchall()
+            if top_safe:
+                context_parts.append("\nTOP 10 SAFEST restaurants in Santa Clara County:")
+                for i, r in enumerate(top_safe, 1):
+                    context_parts.append(
+                        f"{i}. {r['name']} ({r['city']}) — Risk Score: {r['risk_score']}/100 "
+                        f"({r['risk_level']}), Avg Inspection: {r['avg_score']}/100, "
+                        f"Violations: {r['total_violations']} total, {r['critical_violations']} critical"
+                    )
+
+        # Step 6: General stats
         stats = conn.execute(
             "SELECT COUNT(*) as total, AVG(risk_score) as avg_risk FROM businesses"
         ).fetchone()
         context_parts.append(
-            f"\nSanta Clara County: {stats['total']} food businesses, "
-            f"average risk score: {round(stats['avg_risk'], 1)}"
+            f"\nSanta Clara County overview: {stats['total']} food businesses, "
+            f"average risk score: {round(stats['avg_risk'], 1)}/100"
         )
 
         # Step 6: Nemotron inference

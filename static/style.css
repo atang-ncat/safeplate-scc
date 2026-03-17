@@ -611,8 +611,8 @@ body {
     position: fixed;
     bottom: 80px;
     right: 24px;
-    width: 400px;
-    height: 520px;
+    width: 440px;
+    height: 560px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius);
@@ -687,12 +687,17 @@ body {
     border-radius: var(--radius-sm);
     font-size: 13px;
     line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    max-width: 100%;
 }
 
 .message.bot .message-content {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
+    white-space: pre-wrap;
 }
 
 .message.user .message-content {
