@@ -1,3 +1,8 @@
+
+
+https://github.com/user-attachments/assets/8501e6bc-9f01-42d6-8374-371240f6aa44
+
+
 # SafePlate SCC — AI-Powered Food Safety Intelligence
 
 **Know Before You Eat.** Real-time food safety intelligence for Santa Clara County, powered by NVIDIA Nemotron running locally on DGX Spark.
@@ -24,7 +29,11 @@ Santa Clara County — home to **2 million residents** and the heart of Silicon 
 SafePlate SCC transforms raw county inspection data into an **interactive, AI-powered food safety map** that anyone can use:
 
 - **Interactive Map** — 8,588 restaurants plotted with color-coded risk markers (green/yellow/red)
-- **Smart Search** — Find any restaurant by name, address, or city
+- **Smart Search** — Find 
+
+https://github.com/user-attachments/assets/4a02755c-f750-4ae5-9295-7e3e9adfc0c1
+
+any restaurant by name, address, or city
 - **AI Chat (Nemotron)** — Ask natural language questions: *"Is it safe to eat at Habana Cuba Restaurant?"*
 - **Risk Scoring** — Proprietary algorithm weighing violation severity, recency, and frequency
 - **OpenClaw MCP Tools** — Agentic AI integration for autonomous food safety queries
